@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: mcp-server
+    environment:
+      - LOG_LEVEL=DEBUG
+    networks:
+      - mcp-network
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: agent
+    ports:
+      - "8001:8000"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8000
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - mcp-server
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    volumes:
+      - ./mcp-server:/mcp-server:ro
+
+networks:
+  mcp-network:
+    driver: bridge
