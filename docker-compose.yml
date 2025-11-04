@@ -1,9 +1,9 @@
 services:
-  mcp-server:
+  toolbox:
     build:
-      context: ./mcp-server
+      context: ./toolbox
       dockerfile: Dockerfile
-    container_name: mcp-server
+    container_name: toolbox
     ports:
       - "8000:8000"
     environment:
@@ -25,14 +25,14 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - MCP_SERVER_URL=http://mcp-server:8000
+      - MCP_SERVER_URL=http://toolbox:8000
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}
       - LOG_LEVEL=DEBUG
     depends_on:
-      mcp-server:
+      toolbox:
         condition: service_healthy
     networks:
       - mcp-network
@@ -46,14 +46,14 @@ services:
     ports:
       - "8002:8000"
     environment:
-      - MCP_SERVER_URL=http://mcp-server:8000
+      - MCP_SERVER_URL=http://toolbox:8000
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}
       - LOG_LEVEL=DEBUG
     depends_on:
-      mcp-server:
+      toolbox:
         condition: service_healthy
     networks:
       - mcp-network

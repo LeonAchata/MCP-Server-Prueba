@@ -29,8 +29,8 @@ echo ""
 
 # Paso 2: Limpiar contenedores antiguos
 echo -e "${YELLOW}📍 Paso 2/7: Limpiando contenedores antiguos...${NC}"
-docker stop agent-http agent-websocket mcp-server 2>/dev/null
-docker rm agent-http agent-websocket mcp-server 2>/dev/null
+docker stop agent-http agent-websocket toolbox 2>/dev/null
+docker rm agent-http agent-websocket toolbox 2>/dev/null
 echo -e "${GREEN}   ✅ Contenedores limpiados${NC}"
 echo ""
 

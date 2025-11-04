@@ -19,8 +19,8 @@ Write-Host ""
 
 # Paso 2: Limpiar contenedores antiguos
 Write-Host "📍 Paso 2/7: Limpiando contenedores antiguos..." -ForegroundColor Yellow
-docker stop agent-http agent-websocket mcp-server 2>$null
-docker rm agent-http agent-websocket mcp-server 2>$null
+docker stop agent-http agent-websocket toolbox 2>$null
+docker rm agent-http agent-websocket toolbox 2>$null
 Write-Host "   ✅ Contenedores limpiados" -ForegroundColor Green
 Write-Host ""
 

@@ -20,7 +20,7 @@ class MCPClient:
         
         Args:
             toolbox_url: Base URL of the MCP Toolbox Server
-                        (e.g., http://mcp-server:8000 in Docker,
+                        (e.g., http://toolbox:8000 in Docker,
                          http://toolbox-service.namespace.svc.cluster.local in K8s)
             timeout: Request timeout in seconds
         """

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Agent settings."""
     
     # MCP Server
-    mcp_server_url: str = "http://mcp-server:8000"
+    mcp_server_url: str = "http://toolbox:8000"
     
     # AWS Bedrock
     aws_region: str = "us-east-1"

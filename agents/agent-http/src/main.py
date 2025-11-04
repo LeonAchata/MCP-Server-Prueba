@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize MCP client with HTTP REST transport
         logger.info("Initializing MCP client (HTTP REST)...")
-        mcp_server_url = os.getenv("MCP_SERVER_URL", "http://mcp-server:8000")
+        mcp_server_url = os.getenv("MCP_SERVER_URL", "http://toolbox:8000")
         mcp_client = MCPClient(mcp_server_url)
         await mcp_client.connect()
         
