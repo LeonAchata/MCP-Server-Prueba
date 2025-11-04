@@ -1,129 +1,172 @@
-"""MCP Client implementation (renamed module)."""
+"""MCP Client - HTTP REST Implementation.
+
+This client connects to an MCP Toolbox Server via HTTP REST,
+following the MCP protocol structure and semantics.
+"""
 
 import logging
-from typing import Any, Dict, List, Optional
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from typing import Any, Dict, List
+import httpx
 
 logger = logging.getLogger(__name__)
 
 
 class MCPClient:
-    """MCP Client for connecting to MCP server."""
+    """MCP Client for connecting to MCP Toolbox via HTTP REST."""
     
-    def __init__(self, server_command: List[str]):
+    def __init__(self, toolbox_url: str, timeout: float = 30.0):
         """
         Initialize MCP client.
         
         Args:
-            server_command: Command to start MCP server (for stdio transport)
+            toolbox_url: Base URL of the MCP Toolbox Server
+                        (e.g., http://mcp-server:8000 in Docker,
+                         http://toolbox-service.namespace.svc.cluster.local in K8s)
+            timeout: Request timeout in seconds
         """
-        self.server_command = server_command
-        self.session: Optional[ClientSession] = None
+        self.toolbox_url = toolbox_url.rstrip('/')
+        self.timeout = timeout
+        self.client = httpx.AsyncClient(timeout=timeout)
         self.tools: Dict[str, Any] = {}
-        self._client_context = None
-        self._read_stream = None
-        self._write_stream = None
+        self.session = self  # For compatibility with existing code
         
+        logger.info(f"MCP Client initialized - Toolbox URL: {self.toolbox_url}")
+    
     async def connect(self):
-        """Connect to MCP server and discover tools."""
+        """
+        Connect to MCP Toolbox and discover tools.
+        
+        This method establishes connection to the toolbox server
+        and retrieves available tools following MCP protocol.
+        """
         try:
-            logger.info(f"Connecting to MCP server with command: {' '.join(self.server_command)}")
+            logger.info(f"Connecting to MCP Toolbox at {self.toolbox_url}")
             
-            # Create server parameters
-            server_params = StdioServerParameters(
-                command=self.server_command[0],
-                args=self.server_command[1:],
-                env=None
-            )
+            # Test connection
+            response = await self.client.get(f"{self.toolbox_url}/health")
+            response.raise_for_status()
+            health_data = response.json()
             
-            # Connect to server
-            self._client_context = stdio_client(server_params)
-            self._read_stream, self._write_stream = await self._client_context.__aenter__()
-            
-            # Create session
-            self.session = ClientSession(self._read_stream, self._write_stream)
-            await self.session.__aenter__()
-            
-            # Initialize session
-            await self.session.initialize()
-            
-            logger.info("Connected to MCP server successfully")
+            logger.info(f"Connected to {health_data.get('service', 'MCP Toolbox')}")
+            logger.info(f"Protocol: {health_data.get('protocol', 'MCP over HTTP')}")
             
             # Discover tools
             await self.discover_tools()
             
+            logger.info("MCP Client connected successfully")
+            
+        except httpx.HTTPError as e:
+            logger.error(f"Failed to connect to MCP Toolbox: {str(e)}")
+            raise ConnectionError(f"Cannot connect to MCP Toolbox at {self.toolbox_url}: {str(e)}")
         except Exception as e:
-            logger.error(f"Failed to connect to MCP server: {str(e)}")
+            logger.error(f"Unexpected error during connection: {str(e)}")
             raise
     
     async def discover_tools(self):
-        """Discover available tools from MCP server."""
+        """
+        Discover available tools from MCP Toolbox.
+        
+        Follows MCP protocol's tools/list specification.
+        """
         try:
-            logger.info("Discovering tools from MCP server...")
+            logger.info("Discovering tools from MCP Toolbox...")
             
-            tools_response = await self.session.list_tools()
+            # Call MCP tools/list endpoint
+            response = await self.client.post(f"{self.toolbox_url}/mcp/tools/list")
+            response.raise_for_status()
             
-            for tool in tools_response.tools:
-                self.tools[tool.name] = {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "input_schema": tool.inputSchema
+            tools_data = response.json()
+            tools_list = tools_data.get("tools", [])
+            
+            # Store tools in MCP format
+            for tool in tools_list:
+                self.tools[tool["name"]] = {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "input_schema": tool.get("inputSchema", {})
                 }
             
             tool_names = list(self.tools.keys())
-            logger.info(f"Discovered {len(tool_names)} tools from MCP server: {', '.join(tool_names)}")
+            logger.info(f"Discovered {len(tool_names)} tools: {', '.join(tool_names)}")
             
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error(f"Failed to discover tools: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Error parsing tools response: {str(e)}")
             raise
     
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """
-        Call a tool on the MCP server.
+        Call a tool on the MCP Toolbox.
+        
+        Follows MCP protocol's tools/call specification.
         
         Args:
-            tool_name: Name of the tool to call
-            arguments: Tool arguments
+            tool_name: Name of the tool to execute
+            arguments: Tool arguments as dict
             
         Returns:
-            Tool execution result
+            Tool execution result (string)
         """
         try:
             logger.info(f"MCP call: {tool_name}({arguments})")
             
+            # Validate tool exists
             if tool_name not in self.tools:
-                raise ValueError(f"Tool {tool_name} not found. Available tools: {list(self.tools.keys())}")
+                available = list(self.tools.keys())
+                raise ValueError(
+                    f"Tool '{tool_name}' not found. Available tools: {available}"
+                )
             
-            result = await self.session.call_tool(tool_name, arguments)
+            # Call MCP tools/call endpoint
+            response = await self.client.post(
+                f"{self.toolbox_url}/mcp/tools/call",
+                json={
+                    "name": tool_name,
+                    "arguments": arguments
+                }
+            )
+            response.raise_for_status()
             
-            # Extract text content from result
-            if result.content and len(result.content) > 0:
-                response = result.content[0].text
-                logger.info(f"MCP response: {response}")
-                return response
-            else:
-                logger.warning(f"No content in MCP response for tool {tool_name}")
+            # Parse MCP response
+            result_data = response.json()
+            content = result_data.get("content", [])
+            
+            if not content:
+                logger.warning(f"Tool {tool_name} returned no content")
                 return None
-                
+            
+            # Extract text from first content item (MCP format)
+            result_text = content[0].get("text", "")
+            
+            logger.info(f"MCP response: {result_text}")
+            return result_text
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error calling tool {tool_name}: {e.response.status_code} - {e.response.text}")
+            raise
+        except httpx.HTTPError as e:
+            logger.error(f"Network error calling tool {tool_name}: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"Failed to call tool {tool_name}: {str(e)}")
+            logger.error(f"Error calling tool {tool_name}: {str(e)}")
             raise
     
     async def disconnect(self):
-        """Disconnect from MCP server."""
+        """Disconnect from MCP Toolbox and cleanup resources."""
         try:
-            if self.session:
-                await self.session.__aexit__(None, None, None)
-            if self._client_context:
-                await self._client_context.__aexit__(None, None, None)
-            logger.info("Disconnected from MCP server")
+            logger.info("Disconnecting from MCP Toolbox...")
+            await self.client.aclose()
+            logger.info("MCP Client disconnected")
         except Exception as e:
-            logger.error(f"Error disconnecting from MCP server: {str(e)}")
+            logger.error(f"Error disconnecting: {str(e)}")
     
     def get_tools_for_bedrock(self) -> List[Dict[str, Any]]:
         """
-        Get tools formatted for Bedrock function calling.
+        Get tools formatted for Amazon Bedrock function calling.
+        
+        Converts MCP tool schemas to Bedrock's expected format.
         
         Returns:
             List of tools in Bedrock format
@@ -142,4 +185,21 @@ class MCPClient:
             }
             bedrock_tools.append(bedrock_tool)
         
+        logger.debug(f"Converted {len(bedrock_tools)} tools to Bedrock format")
         return bedrock_tools
+    
+    def get_tools_description(self) -> List[Dict[str, Any]]:
+        """
+        Get tools description for LangChain.
+        
+        Returns:
+            List of tool descriptions
+        """
+        tools_desc = []
+        for name, info in self.tools.items():
+            tools_desc.append({
+                "name": name,
+                "description": info["description"],
+                "input_schema": info["input_schema"]
+            })
+        return tools_desc

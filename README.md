@@ -7,8 +7,9 @@ Sistema de aprendizaje sobre **Model Context Protocol (MCP)** usando LangGraph +
 Este proyecto implementa un agente inteligente que:
 - Usa **LangGraph** para orquestar el flujo de trabajo
 - Se conecta a **Amazon Bedrock Claude 3.5** como LLM
-- Comunica con un **MCP Server** que expone 4 herramientas simples
+- Comunica con un **MCP Toolbox Server** que expone 4 herramientas simples
 - Todo containerizado con **Docker** para fácil deployment
+- **MCP sobre HTTP REST** - Protocolo MCP real con transporte HTTP
 
 ## 🏗️ Arquitectura
 
@@ -17,19 +18,36 @@ Este proyecto implementa un agente inteligente que:
 │              Docker Network (mcp-network)             │
 │                                                       │
 │  ┌────────────────┐         ┌──────────────────┐    │
-│  │  MCP Server    │◄────────┤     Agent        │    │
-│  │                │  stdio  │                  │    │
-│  │  4 Tools:      │         │  • FastAPI       │    │
-│  │  • add         │         │  • LangGraph     │    │
-│  │  • multiply    │         │  • Bedrock       │    │
-│  │  • uppercase   │         │  • MCP Client    │    │
+│  │  MCP Toolbox   │◄────────┤     Agent        │    │
+│  │  Server        │   HTTP  │                  │    │
+│  │                │   REST  │  • FastAPI       │    │
+│  │  4 Tools:      │         │  • LangGraph     │    │
+│  │  • add         │         │  • Bedrock       │    │
+│  │  • multiply    │         │  • MCP Client    │    │
+│  │  • uppercase   │         │                  │    │
 │  │  • count_words │         │                  │    │
 │  └────────────────┘         └──────────────────┘    │
-│                                      │               │
-└──────────────────────────────────────┼───────────────┘
+│   Port 8000                      Port 8001           │
+└──────────────────────────────────────────────────────┘
                                        │
                               Usuario (POST /process)
 ```
+
+## 🎯 MCP Protocol
+
+Este proyecto implementa el **Model Context Protocol (MCP)** sobre HTTP REST:
+
+- ✅ **Estructura MCP real**: Herramientas con schemas JSON
+- ✅ **Endpoints MCP**: `/mcp/tools/list` y `/mcp/tools/call`
+- ✅ **Formato de respuesta MCP**: Content con type y text
+- ✅ **Compatible con Kubernetes**: Service discovery por DNS
+- ✅ **Listo para producción**: Health checks, logs, errores
+
+**Ventajas sobre stdio/SSE:**
+- 🚀 Funciona perfecto en Docker y Kubernetes
+- 🔍 Fácil de debuggear con curl/Postman
+- 📊 Compatible con load balancers y service mesh
+- ⚡ Más rápido y confiable en producción
 
 ## 📁 Estructura del Proyecto
 
@@ -108,7 +126,40 @@ El sistema iniciará:
 
 ## 📡 Endpoints
 
-### GET /health
+### MCP Toolbox Server (Port 8000)
+
+#### GET /health
+```bash
+curl http://localhost:8000/health
+```
+
+Respuesta:
+```json
+{
+  "status": "healthy",
+  "service": "mcp-toolbox",
+  "tools_count": 4,
+  "protocol": "MCP over HTTP REST"
+}
+```
+
+#### POST /mcp/tools/list
+Lista todas las herramientas disponibles en formato MCP:
+```bash
+curl -X POST http://localhost:8000/mcp/tools/list
+```
+
+#### POST /mcp/tools/call
+Ejecuta una herramienta:
+```bash
+curl -X POST http://localhost:8000/mcp/tools/call \
+  -H "Content-Type: application/json" \
+  -d '{"name": "add", "arguments": {"a": 5, "b": 3}}'
+```
+
+### Agent API (Port 8001)
+
+#### GET /health
 
 Verifica el estado del sistema:
 
@@ -226,15 +277,40 @@ docker-compose logs -f mcp-server
 - **LangGraph** - Orquestación de workflows
 - **LangChain** - Framework LLM
 - **Amazon Bedrock** - Claude 3.5 Sonnet
-- **MCP (Model Context Protocol)** - Comunicación con herramientas
+- **MCP (Model Context Protocol)** - Protocolo de herramientas sobre HTTP REST
 - **Docker** - Containerización
+- **httpx** - Cliente HTTP asíncrono
 
 ## ⚠️ Notas Importantes
 
 - **NO subir el archivo `.env`** a GitHub (ya está en `.gitignore`)
 - Las credenciales de AWS son sensibles - manéjalas con cuidado
-- El sistema es para aprendizaje, no está optimizado para producción
+- **MCP sobre HTTP REST**: Usa el protocolo MCP real pero con transporte HTTP en lugar de stdio/SSE
+- **Listo para Kubernetes**: Funciona perfecto en EKS con service discovery
 - Los contenedores se reinician automáticamente si fallan
+
+## 🏢 Deployment a AWS/EKS
+
+Este proyecto está diseñado para desplegarse en AWS:
+
+```yaml
+# Ejemplo de Service en Kubernetes
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-toolbox-service
+spec:
+  selector:
+    app: mcp-toolbox
+  ports:
+  - port: 80
+    targetPort: 8000
+```
+
+El agent se conectará usando DNS interno:
+```bash
+MCP_SERVER_URL=http://mcp-toolbox-service.namespace.svc.cluster.local
+```
 
 ## 📝 Licencia
 

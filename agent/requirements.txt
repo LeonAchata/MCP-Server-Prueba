@@ -7,6 +7,5 @@ langchain-core
 langchain-aws
 langgraph
 boto3
-mcp
 httpx
 python-dotenv

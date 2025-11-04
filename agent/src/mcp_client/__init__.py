@@ -1,4 +1,4 @@
-"""MCP client package (renamed to avoid conflict with external 'mcp' library)."""
+"""MCP client package - HTTP REST implementation."""
 
 from .client import MCPClient
 

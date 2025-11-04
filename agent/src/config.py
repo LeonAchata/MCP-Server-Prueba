@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     aws_access_key_id: str
     aws_secret_access_key: str
-    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    bedrock_model_id: str = "us.amazon.nova-pro-v1:0"
     
     # Logging
     log_level: str = "DEBUG"

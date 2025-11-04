@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
+import os
 
 from config import setup_logging, settings
 from mcp_client import MCPClient
@@ -28,10 +29,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Agent application...")
     
     try:
-        # Initialize MCP client
-        logger.info("Initializing MCP client...")
-        server_command = ["python", "/app/src/server.py"]
-        mcp_client = MCPClient(server_command)
+        # Initialize MCP client with HTTP REST transport
+        logger.info("Initializing MCP client (HTTP REST)...")
+        mcp_server_url = os.getenv("MCP_SERVER_URL", "http://mcp-server:8000")
+        mcp_client = MCPClient(mcp_server_url)
         await mcp_client.connect()
         
         # Create workflow

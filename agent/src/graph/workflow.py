@@ -44,10 +44,14 @@ def create_workflow(mcp_client):
     # Create graph
     graph = StateGraph(AgentState)
     
+    # Create wrapper for tool_execution that binds mcp_client
+    async def tool_exec_wrapper(state):
+        return await tool_execution_node(state, mcp_client)
+    
     # Add nodes
     graph.add_node("process_input", process_input_node)
     graph.add_node("llm", lambda state: llm_node(state, llm, mcp_client))
-    graph.add_node("tool_execution", lambda state: tool_execution_node(state, mcp_client))
+    graph.add_node("tool_execution", tool_exec_wrapper)
     graph.add_node("final_answer", final_answer_node)
     
     # Add edges
