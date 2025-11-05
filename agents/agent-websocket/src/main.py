@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
-from config import settings
+from config import settings, setup_langsmith
 from mcp_client.client import MCPClient
 from graph.workflow import create_workflow
 from websocket.connection import ConnectionManager
@@ -26,6 +26,9 @@ async def lifespan(app: FastAPI):
     global mcp_client, workflow, message_handler
     
     logger.info("🚀 Starting WebSocket Agent...")
+    
+    # Setup LangSmith tracing
+    setup_langsmith()
     
     try:
         # Initialize MCP Client

@@ -64,6 +64,10 @@ services:
       - LLM_GATEWAY_URL=http://llm-gateway:8003
       - DEFAULT_MODEL=bedrock-nova-pro
       - LOG_LEVEL=DEBUG
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-true}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-mcp-agent-http}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}
     depends_on:
       toolbox:
         condition: service_healthy
@@ -85,6 +89,10 @@ services:
       - LLM_GATEWAY_URL=http://llm-gateway:8003
       - DEFAULT_MODEL=bedrock-nova-pro
       - LOG_LEVEL=DEBUG
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-true}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-mcp-agent-websocket}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}
     depends_on:
       toolbox:
         condition: service_healthy

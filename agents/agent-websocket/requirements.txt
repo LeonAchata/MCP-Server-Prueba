@@ -6,6 +6,7 @@ langchain
 langchain-core
 langchain-aws
 langgraph
+langsmith
 boto3
 httpx
 python-dotenv

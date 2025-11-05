@@ -6,6 +6,7 @@ import re
 from typing import Dict, Any
 from datetime import datetime
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ def _detect_model_from_text(text: str) -> str | None:
     return None
 
 
+@traceable(run_type="chain", name="process_input")
 def process_input_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process initial user input.
@@ -82,6 +84,7 @@ def process_input_node(state: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+@traceable(run_type="llm", name="llm_node")
 async def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, Any]:
     """
     Call LLM Gateway to process messages and decide next action.
@@ -188,6 +191,7 @@ If you don't need any tools, just respond normally to help the user."""
     }
 
 
+@traceable(run_type="tool", name="tool_execution")
 async def tool_execution_node(state: Dict[str, Any], mcp_client) -> Dict[str, Any]:
     """
     Execute tools requested by LLM via MCP.
@@ -273,6 +277,7 @@ async def tool_execution_node(state: Dict[str, Any], mcp_client) -> Dict[str, An
     }
 
 
+@traceable(run_type="chain", name="final_answer")
 def final_answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract final answer from messages.
@@ -313,6 +318,7 @@ def final_answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+@traceable(run_type="chain", name="route_decision")
 def route_decision(state: Dict[str, Any]) -> str:
     """
     Route based on whether LLM wants to use tools.

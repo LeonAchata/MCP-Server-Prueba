@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 
-from config import setup_logging, settings
+from config import setup_logging, settings, setup_langsmith
 from mcp_client import MCPClient
 from graph import create_workflow
 from api.routes import router, set_workflow, set_mcp_client
@@ -28,6 +28,9 @@ async def lifespan(app: FastAPI):
     
     # Startup
     logger.info("Starting Agent application...")
+    
+    # Setup LangSmith tracing
+    setup_langsmith()
     
     try:
         # Initialize MCP client with HTTP REST transport
