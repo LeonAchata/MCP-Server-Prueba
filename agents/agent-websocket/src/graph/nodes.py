@@ -2,11 +2,35 @@
 
 import logging
 import json
+import re
 from typing import Dict, Any
 from datetime import datetime
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_model_from_text(text: str) -> str | None:
+    """
+    Detect model name from user text.
+    
+    Args:
+        text: User input text
+        
+    Returns:
+        Model name if detected, None otherwise
+    """
+    text_lower = text.lower()
+    
+    # Check for model keywords - using exact registry names
+    if re.search(r'\b(usa|use|utiliza|con)\s+(openai|gpt|gpt-4|gpt4)', text_lower):
+        return "gpt-4o"  # Registry name for OpenAI
+    elif re.search(r'\b(usa|use|utiliza|con)\s+(gemini|google)', text_lower):
+        return "gemini-pro"  # Registry name for Gemini
+    elif re.search(r'\b(usa|use|utiliza|con)\s+(bedrock|nova|aws)', text_lower):
+        return "bedrock-nova-pro"  # Registry name for Bedrock
+    
+    return None
 
 
 def process_input_node(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -20,26 +44,45 @@ def process_input_node(state: Dict[str, Any]) -> Dict[str, Any]:
         Updated state
     """
     user_input = state.get("user_input", "")
+    current_model = state.get("model")
+    
     logger.info(f"Node: process_input | Processing: {user_input}")
+    
+    # Try to detect model from text if not already specified
+    if not current_model:
+        detected_model = _detect_model_from_text(user_input)
+        if detected_model:
+            logger.info(f"Node: process_input | Detected model from text: {detected_model}")
+            current_model = detected_model
     
     # Create initial human message
     human_message = HumanMessage(content=user_input)
     
     # Add step
     steps = state.get("steps", [])
-    steps.append({
+    step_info = {
         "node": "process_input",
         "timestamp": datetime.now().isoformat(),
         "input": user_input
-    })
+    }
+    if current_model:
+        step_info["model_selected"] = current_model
     
-    return {
+    steps.append(step_info)
+    
+    result = {
         "messages": [human_message],
         "steps": steps
     }
+    
+    # Update model in state if detected
+    if current_model:
+        result["model"] = current_model
+    
+    return result
 
 
-def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, Any]:
+async def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, Any]:
     """
     Call LLM Gateway to process messages and decide next action.
     
@@ -55,16 +98,19 @@ def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, Any]:
     
     messages = state.get("messages", [])
     steps = state.get("steps", [])
+    model = state.get("model")  # Get model from state (can be None)
     
-    # Get tools from MCP in standard format
-    tools = mcp_client.get_tools_for_bedrock()
+    # Get tools from MCP in simple dictionary format
+    tools = mcp_client.get_tools_description()
     
     # Create system message with tool information
     tool_descriptions = []
     for tool in tools:
         tool_info = f"- {tool['name']}: {tool.get('description', 'No description')}"
-        if 'inputSchema' in tool:
-            tool_info += f"\n  Parameters: {json.dumps(tool['inputSchema'].get('properties', {}))}"
+        if 'input_schema' in tool:
+            props = tool['input_schema'].get('properties', {})
+            if props:
+                tool_info += f"\n  Parameters: {json.dumps(props)}"
         tool_descriptions.append(tool_info)
     
     system_prompt = f"""You are a helpful AI assistant with access to the following tools:
@@ -81,13 +127,15 @@ If you don't need any tools, just respond normally to help the user."""
     from langchain_core.messages import HumanMessage
     llm_messages = [HumanMessage(content=system_prompt)] + messages
     
-    # Call LLM via Gateway (synchronous call in async context handled by workflow)
-    import asyncio
-    response = asyncio.run(llm_client.generate(
+    # Call LLM via Gateway with optional model parameter (now using await)
+    response = await llm_client.generate(
         messages=llm_messages,
+        model=model,  # Pass model from state (None uses default)
         temperature=0.7,
         max_tokens=2000
-    ))
+    )
+    
+    logger.info(f"Node: llm | Used model: {model or llm_client.default_model}")
     
     # Check if response contains tool calls
     response_text = response.content
@@ -123,10 +171,14 @@ If you don't need any tools, just respond normally to help the user."""
     
     logger.info(f"Node: llm | Response received: has_tool_calls={has_tool_call}")
     
-    # Add step
+    # Get the actual model used (from response metadata or default)
+    model_used = response.additional_kwargs.get("model") or model or llm_client.default_model
+    
+    # Add step with model information
     steps.append({
         "node": "llm",
         "timestamp": datetime.now().isoformat(),
+        "model": model_used,
         "has_tool_calls": bool(hasattr(response, 'tool_calls') and response.tool_calls)
     })
     

@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     
     # Google Gemini credentials
     GOOGLE_API_KEY: Optional[str] = None
-    GEMINI_DEFAULT_MODEL: str = "gemini-pro"
+    GEMINI_DEFAULT_MODEL: str = "gemini-1.5-flash"  # Updated to available model
     
     # Metrics configuration
     METRICS_ENABLED: bool = True

@@ -106,15 +106,21 @@ class BedrockLLM(BaseLLM):
             # Call Bedrock API
             logger.info(f"Calling Bedrock: model={self.model_id}, messages={len(conversation)}")
             
-            response = self.client.converse(
-                modelId=self.model_id,
-                messages=conversation,
-                system=[{"text": system_prompt}] if system_prompt else None,
-                inferenceConfig={
+            # Prepare converse parameters
+            converse_params = {
+                "modelId": self.model_id,
+                "messages": conversation,
+                "inferenceConfig": {
                     "temperature": temperature,
                     "maxTokens": max_tokens
                 }
-            )
+            }
+            
+            # Only add system if it exists
+            if system_prompt:
+                converse_params["system"] = [{"text": system_prompt}]
+            
+            response = self.client.converse(**converse_params)
             
             # Extract response
             output_message = response["output"]["message"]

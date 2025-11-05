@@ -10,5 +10,6 @@ class AgentState(TypedDict):
     
     messages: Annotated[List[BaseMessage], add_messages]  # Message history with reducer
     user_input: str
+    model: Optional[str]  # Optional: LLM model to use (e.g., "bedrock-nova-pro", "openai-gpt4o", "gemini-pro")
     steps: List[Dict[str, Any]]
     final_answer: Optional[str]

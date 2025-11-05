@@ -17,6 +17,7 @@ mcp_client = None
 class ProcessRequest(BaseModel):
     """Request model for /process endpoint."""
     input: str
+    model: Optional[str] = None  # Optional: specify model (e.g., "bedrock-nova-pro", "openai-gpt4o", "gemini-pro")
 
 
 class ProcessResponse(BaseModel):
@@ -77,6 +78,7 @@ async def process_request(request: ProcessRequest):
         # Invoke workflow
         initial_state = {
             "user_input": request.input,
+            "model": request.model,  # Pass model selection to workflow
             "messages": [],
             "final_answer": None,
             "steps": []

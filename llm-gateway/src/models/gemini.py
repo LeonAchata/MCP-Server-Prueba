@@ -27,7 +27,7 @@ class GeminiLLM(BaseLLM):
     
     @property
     def name(self) -> str:
-        return "gemini-pro"
+        return "gemini-2.5-pro"
     
     @property
     def provider(self) -> str:
@@ -35,7 +35,7 @@ class GeminiLLM(BaseLLM):
     
     @property
     def description(self) -> str:
-        return "Google Gemini Pro - Advanced multimodal AI model"
+        return f"Google Gemini - Advanced multimodal AI model (using {self.model_name})"
     
     def _convert_messages_to_gemini_format(self, messages: List[Dict[str, str]]) -> tuple:
         """Convert standard messages to Gemini format.

@@ -62,6 +62,7 @@ class MessageHandler:
             data: Message data
         """
         user_input = data.get("content", "")
+        model = data.get("model")  # Optional: model to use (e.g., "openai-gpt4o", "gemini-pro")
         
         if not user_input:
             await self.manager.send_message(connection_id, {
@@ -84,6 +85,7 @@ class MessageHandler:
             initial_state = {
                 "messages": [],
                 "user_input": user_input,
+                "model": model,  # Pass model to workflow
                 "steps": [],
                 "final_answer": None
             }

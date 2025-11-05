@@ -39,10 +39,10 @@ services:
       - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}
       # OpenAI
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_DEFAULT_MODEL=gpt-4o
+      - OPENAI_DEFAULT_MODEL=${OPENAI_DEFAULT_MODEL:-gpt-4o}
       # Google Gemini
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_DEFAULT_MODEL=gemini-pro
+      - GEMINI_DEFAULT_MODEL=${GEMINI_DEFAULT_MODEL:-gemini-1.5-flash}
     networks:
       - mcp-network
     restart: unless-stopped

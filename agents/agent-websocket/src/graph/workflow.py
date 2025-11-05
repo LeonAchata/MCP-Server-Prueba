@@ -44,9 +44,13 @@ def create_workflow(mcp_client):
     async def tool_exec_wrapper(state):
         return await tool_execution_node(state, mcp_client)
     
+    # Create wrapper for llm_node that binds clients
+    async def llm_wrapper(state):
+        return await llm_node(state, llm_client, mcp_client)
+    
     # Add nodes
     graph.add_node("process_input", process_input_node)
-    graph.add_node("llm", lambda state: llm_node(state, llm_client, mcp_client))
+    graph.add_node("llm", llm_wrapper)
     graph.add_node("tool_execution", tool_exec_wrapper)
     graph.add_node("final_answer", final_answer_node)
     
