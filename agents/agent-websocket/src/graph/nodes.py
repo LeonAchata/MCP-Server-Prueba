@@ -84,7 +84,15 @@ def process_input_node(state: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-@traceable(run_type="llm", name="llm_node")
+@traceable(
+    run_type="chain",
+    name="llm_gateway_routing",
+    metadata=lambda state, **kwargs: {
+        "component": "websocket-agent",
+        "model_requested": state.get("model"),
+        "messages_count": len(state.get("messages", []))
+    }
+)
 async def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, Any]:
     """
     Call LLM Gateway to process messages and decide next action.
@@ -176,12 +184,22 @@ If you don't need any tools, just respond normally to help the user."""
     
     # Get the actual model used (from response metadata or default)
     model_used = response.additional_kwargs.get("model") or model or llm_client.default_model
+    cached = response.additional_kwargs.get("cached", False)
+    latency_ms = response.additional_kwargs.get("latency_ms", 0)
+    
+    # Log detailed response info
+    logger.info(
+        f"Node: llm | Model used: {model_used}, "
+        f"cached={cached}, latency={latency_ms}ms"
+    )
     
     # Add step with model information
     steps.append({
         "node": "llm",
         "timestamp": datetime.now().isoformat(),
         "model": model_used,
+        "cached": cached,
+        "latency_ms": latency_ms,
         "has_tool_calls": bool(hasattr(response, 'tool_calls') and response.tool_calls)
     })
     

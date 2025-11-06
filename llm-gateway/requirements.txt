@@ -3,6 +3,7 @@ uvicorn
 pydantic
 pydantic-settings
 httpx
+langsmith
 
 # AWS Bedrock
 boto3

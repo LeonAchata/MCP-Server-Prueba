@@ -5,6 +5,7 @@ import logging
 from typing import List, Dict, Any
 import boto3
 from botocore.exceptions import ClientError
+from langsmith import traceable
 
 from .base import BaseLLM
 from ..config import settings
@@ -65,8 +66,20 @@ class BedrockLLM(BaseLLM):
             elif role == "assistant":
                 conversation.append({"role": "assistant", "content": [{"text": content}]})
         
-        return system_prompt, conversation
+        return (system_prompt, conversation)
     
+    @traceable(
+        run_type="llm",
+        name="bedrock_api_call",
+        metadata=lambda self, messages, temperature, max_tokens, **kwargs: {
+            "provider": "aws",
+            "model": self.model_id,
+            "region": self.region,
+            "messages_count": len(messages),
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+    )
     async def generate(
         self,
         messages: List[Dict[str, str]],

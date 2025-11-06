@@ -4,6 +4,7 @@ import logging
 import httpx
 from typing import List, Dict, Any, Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,62 @@ class LLMGatewayClient:
             additional_kwargs=additional_kwargs
         )
     
+    @traceable(
+        run_type="llm",
+        name="gateway_http_call",
+        metadata=lambda self, url, payload, model: {
+            "method": "POST",
+            "gateway_url": self.gateway_url,
+            "model": model,
+            "messages_count": len(payload.get("messages", [])),
+            "temperature": payload.get("temperature"),
+            "max_tokens": payload.get("max_tokens")
+        }
+    )
+    async def _make_gateway_request(
+        self, 
+        url: str, 
+        payload: Dict[str, Any], 
+        model: str
+    ) -> Dict[str, Any]:
+        """Make HTTP request to gateway with full tracing.
+        
+        Args:
+            url: Full URL to the gateway endpoint
+            payload: Request payload
+            model: Model name being used
+            
+        Returns:
+            Response data from gateway
+            
+        Raises:
+            Exception: If request fails
+        """
+        logger.info(f"📡 HTTP POST {url} for model={model}")
+        logger.debug(f"Request payload: {payload}")
+        
+        response = await self.client.post(url, json=payload)
+        response.raise_for_status()
+        
+        response_data = response.json()
+        logger.info(
+            f"✓ Gateway response: tokens={response_data.get('usage', {}).get('total_tokens')}, "
+            f"cached={response_data.get('cached')}, "
+            f"latency={response_data.get('latency_ms')}ms"
+        )
+        
+        return response_data
+    
+    @traceable(
+        run_type="chain",
+        name="llm_gateway_client",
+        metadata=lambda self, messages, model, **kwargs: {
+            "gateway_url": self.gateway_url,
+            "default_model": self.default_model,
+            "model_requested": model,
+            "messages_count": len(messages)
+        }
+    )
     async def generate(
         self,
         messages: List[BaseMessage],
@@ -160,14 +217,9 @@ class LLMGatewayClient:
                 f"Generating response: model={model_to_use}, "
                 f"messages={len(mcp_messages)}, temp={temperature}"
             )
-            logger.debug(f"Request payload: {payload}")
             
-            # Make request
-            response = await self.client.post(url, json=payload)
-            response.raise_for_status()
-            
-            # Parse response
-            response_data = response.json()
+            # Make traced request to gateway
+            response_data = await self._make_gateway_request(url, payload, model_to_use)
             
             logger.info(
                 f"Generation complete: model={response_data.get('model')}, "

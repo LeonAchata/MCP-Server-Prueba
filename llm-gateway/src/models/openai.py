@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any
 from openai import AsyncOpenAI
 from openai import OpenAIError
+from langsmith import traceable
 
 from .base import BaseLLM
 from ..config import settings
@@ -39,6 +40,17 @@ class OpenAILLM(BaseLLM):
     def description(self) -> str:
         return "OpenAI GPT-4o - Advanced language model with multimodal capabilities"
     
+    @traceable(
+        run_type="llm",
+        name="openai_api_call",
+        metadata=lambda self, messages, temperature, max_tokens, **kwargs: {
+            "provider": "openai",
+            "model": self.model_name,
+            "messages_count": len(messages),
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+    )
     async def generate(
         self,
         messages: List[Dict[str, str]],

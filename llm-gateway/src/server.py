@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from langsmith import traceable
 
 from .config import settings
 from .registry import get_all_llms, get_llm
@@ -121,7 +122,62 @@ async def list_llms():
         )
 
 
+@traceable(
+    run_type="chain",
+    name="provider_generate",
+    metadata=lambda llm, messages, **kwargs: {
+        "provider": llm.provider,
+        "model": llm.name,
+        "messages_count": len(messages),
+        "temperature": kwargs.get("temperature", 0.7),
+        "max_tokens": kwargs.get("max_tokens", 2000)
+    }
+)
+async def _call_provider(
+    llm, 
+    messages: List[Dict[str, str]], 
+    temperature: float, 
+    max_tokens: int
+) -> Dict[str, Any]:
+    """Traced call to LLM provider.
+    
+    Args:
+        llm: LLM instance
+        messages: Conversation messages
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+        
+    Returns:
+        Response data from provider
+    """
+    logger.info(f"🔀 Calling provider: {llm.provider} ({llm.name})")
+    
+    response_data = await llm.generate(
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
+    
+    logger.info(
+        f"✓ Provider response: {llm.provider} - "
+        f"tokens={response_data['usage']['total_tokens']}"
+    )
+    
+    return response_data
+
+
 @app.post("/mcp/llm/generate", response_model=GenerateResponse)
+@traceable(
+    run_type="chain",
+    name="gateway_route_request",
+    metadata=lambda request: {
+        "model": request.model,
+        "messages_count": len(request.messages),
+        "temperature": request.temperature,
+        "max_tokens": request.max_tokens,
+        "cache_enabled": settings.CACHE_ENABLED
+    }
+)
 async def generate_response(request: GenerateRequest):
     """Generate a response from the specified LLM.
     
@@ -151,13 +207,15 @@ async def generate_response(request: GenerateRequest):
         if cached_response:
             cached = True
             response_data = cached_response
-            logger.info(f"Returning cached response for model={request.model}")
+            logger.info(f"✓ Cache hit for model={request.model}")
         else:
             # Get LLM instance
             llm = get_llm(request.model)
+            logger.info(f"🔀 Routing to provider: {llm.provider} ({llm.name})")
             
-            # Generate response
-            response_data = await llm.generate(
+            # Generate response with tracing
+            response_data = await _call_provider(
+                llm=llm,
                 messages=messages,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens
