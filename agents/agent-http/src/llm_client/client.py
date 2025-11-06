@@ -119,18 +119,7 @@ class LLMGatewayClient:
             additional_kwargs=additional_kwargs
         )
     
-    @traceable(
-        run_type="llm",
-        name="gateway_http_call",
-        metadata=lambda self, url, payload, model: {
-            "method": "POST",
-            "gateway_url": self.gateway_url,
-            "model": model,
-            "messages_count": len(payload.get("messages", [])),
-            "temperature": payload.get("temperature"),
-            "max_tokens": payload.get("max_tokens")
-        }
-    )
+    @traceable(run_type="llm", name="gateway_http_call")
     async def _make_gateway_request(
         self, 
         url: str, 
@@ -150,7 +139,11 @@ class LLMGatewayClient:
         Raises:
             Exception: If request fails
         """
-        logger.info(f"📡 HTTP POST {url} for model={model}")
+        logger.info(
+            f"📡 HTTP POST {url} | model={model}, "
+            f"messages={len(payload.get('messages', []))}, "
+            f"temp={payload.get('temperature')}, max_tokens={payload.get('max_tokens')}"
+        )
         logger.debug(f"Request payload: {payload}")
         
         response = await self.client.post(url, json=payload)
@@ -165,16 +158,7 @@ class LLMGatewayClient:
         
         return response_data
     
-    @traceable(
-        run_type="chain",
-        name="llm_gateway_client",
-        metadata=lambda self, messages, model, **kwargs: {
-            "gateway_url": self.gateway_url,
-            "default_model": self.default_model,
-            "model_requested": model,
-            "messages_count": len(messages)
-        }
-    )
+    @traceable(run_type="chain", name="llm_gateway_client")
     async def generate(
         self,
         messages: List[BaseMessage],
@@ -199,6 +183,11 @@ class LLMGatewayClient:
             Exception: If generation fails
         """
         model_to_use = model or self.default_model
+        
+        logger.info(
+            f"LLM Gateway Client | gateway={self.gateway_url}, "
+            f"model_requested={model_to_use}, messages={len(messages)}"
+        )
         
         try:
             # Convert messages to MCP format

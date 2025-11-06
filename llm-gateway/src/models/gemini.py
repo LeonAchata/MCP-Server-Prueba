@@ -66,17 +66,7 @@ class GeminiLLM(BaseLLM):
         
         return (system_instruction, history, last_message)
     
-    @traceable(
-        run_type="llm",
-        name="gemini_api_call",
-        metadata=lambda self, messages, temperature, max_tokens, **kwargs: {
-            "provider": "google",
-            "model": self.model_name,
-            "messages_count": len(messages),
-            "temperature": temperature,
-            "max_tokens": max_tokens
-        }
-    )
+    @traceable(run_type="llm", name="gemini_api_call")
     async def generate(
         self,
         messages: List[Dict[str, str]],
@@ -101,7 +91,10 @@ class GeminiLLM(BaseLLM):
         system_instruction, history, last_message = self._convert_messages_to_gemini_format(messages)
         
         try:
-            logger.info(f"Calling Gemini: model={self.model_name}, messages={len(messages)}")
+            logger.info(
+                f"Gemini API Call | provider=google, model={self.model_name}, "
+                f"messages={len(messages)}, temp={temperature}, max_tokens={max_tokens}"
+            )
             
             # Configure generation
             generation_config = genai.types.GenerationConfig(

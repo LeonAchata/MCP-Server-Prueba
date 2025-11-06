@@ -68,18 +68,7 @@ class BedrockLLM(BaseLLM):
         
         return (system_prompt, conversation)
     
-    @traceable(
-        run_type="llm",
-        name="bedrock_api_call",
-        metadata=lambda self, messages, temperature, max_tokens, **kwargs: {
-            "provider": "aws",
-            "model": self.model_id,
-            "region": self.region,
-            "messages_count": len(messages),
-            "temperature": temperature,
-            "max_tokens": max_tokens
-        }
-    )
+    @traceable(run_type="llm", name="bedrock_api_call")
     async def generate(
         self,
         messages: List[Dict[str, str]],
@@ -99,6 +88,11 @@ class BedrockLLM(BaseLLM):
             Standardized response dictionary
         """
         self.validate_messages(messages)
+        
+        logger.info(
+            f"Bedrock API Call | provider=aws, model={self.model_id}, region={self.region}, "
+            f"messages={len(messages)}, temp={temperature}, max_tokens={max_tokens}"
+        )
         
         # Convert to Bedrock format
         system_prompt, conversation = self._convert_messages_to_bedrock_format(messages)

@@ -122,17 +122,7 @@ async def list_llms():
         )
 
 
-@traceable(
-    run_type="chain",
-    name="provider_generate",
-    metadata=lambda llm, messages, **kwargs: {
-        "provider": llm.provider,
-        "model": llm.name,
-        "messages_count": len(messages),
-        "temperature": kwargs.get("temperature", 0.7),
-        "max_tokens": kwargs.get("max_tokens", 2000)
-    }
-)
+@traceable(run_type="chain", name="provider_generate")
 async def _call_provider(
     llm, 
     messages: List[Dict[str, str]], 
@@ -150,7 +140,10 @@ async def _call_provider(
     Returns:
         Response data from provider
     """
-    logger.info(f"🔀 Calling provider: {llm.provider} ({llm.name})")
+    logger.info(
+        f"🔀 Calling provider: {llm.provider} ({llm.name}) | "
+        f"messages={len(messages)}, temp={temperature}, max_tokens={max_tokens}"
+    )
     
     response_data = await llm.generate(
         messages=messages,
@@ -167,17 +160,7 @@ async def _call_provider(
 
 
 @app.post("/mcp/llm/generate", response_model=GenerateResponse)
-@traceable(
-    run_type="chain",
-    name="gateway_route_request",
-    metadata=lambda request: {
-        "model": request.model,
-        "messages_count": len(request.messages),
-        "temperature": request.temperature,
-        "max_tokens": request.max_tokens,
-        "cache_enabled": settings.CACHE_ENABLED
-    }
-)
+@traceable(run_type="chain", name="gateway_route_request")
 async def generate_response(request: GenerateRequest):
     """Generate a response from the specified LLM.
     
@@ -191,7 +174,11 @@ async def generate_response(request: GenerateRequest):
     cached = False
     
     try:
-        logger.info(f"Generation request: model={request.model}, messages={len(request.messages)}")
+        logger.info(
+            f"Gateway Route | model={request.model}, messages={len(request.messages)}, "
+            f"temp={request.temperature}, max_tokens={request.max_tokens}, "
+            f"cache_enabled={settings.CACHE_ENABLED}"
+        )
         
         # Convert Pydantic models to dicts
         messages = [msg.model_dump() for msg in request.messages]

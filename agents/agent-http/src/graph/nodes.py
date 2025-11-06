@@ -5,7 +5,7 @@ import json
 import re
 from datetime import datetime
 from typing import Dict, Any
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from langsmith import traceable
 
 logger = logging.getLogger(__name__)
@@ -83,18 +83,10 @@ def process_input_node(state: Dict[str, Any]) -> Dict[str, Any]:
     if current_model:
         result["model"] = current_model
     
-    return None
+    return result
 
 
-@traceable(
-    run_type="chain",
-    name="llm_gateway_routing",
-    metadata=lambda state, **kwargs: {
-        "component": "agent",
-        "model_requested": state.get("model"),
-        "messages_count": len(state.get("messages", []))
-    }
-)
+@traceable(run_type="chain", name="llm_gateway_routing")
 async def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, Any]:
     """
     Call LLM Gateway to process messages and decide next action.
@@ -112,6 +104,12 @@ async def llm_node(state: Dict[str, Any], llm_client, mcp_client) -> Dict[str, A
     messages = state.get("messages", [])
     steps = state.get("steps", [])
     model = state.get("model")  # Get model from state (can be None)
+    
+    # Log metadata for tracing
+    logger.info(
+        f"Node: llm | component=agent, model_requested={model}, "
+        f"messages_count={len(messages)}"
+    )
     
     # Get tools from MCP in simple dictionary format
     tools = mcp_client.get_tools_description()
@@ -137,7 +135,9 @@ ARGUMENTS: {{"arg1": "value1", "arg2": "value2"}}
 If you don't need any tools, just respond normally to help the user."""
     
     # Prepare messages for LLM with system prompt
-    llm_messages = [HumanMessage(content=system_prompt)] + messages
+    llm_messages = [SystemMessage(content=system_prompt)] + messages
+    
+    logger.info(f"Node: llm | Sending {len(llm_messages)} messages to LLM (1 system + {len(messages)} user)")
     
     # Call LLM via Gateway with optional model parameter (now using await)
     response = await llm_client.generate(
